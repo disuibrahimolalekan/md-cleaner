@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Markdown Cleaner & Reconstructor</title>
+<style>
+  :root {
+    --bg: #0e0e10;
+    --surface: #18181b;
+    --border: #2a2a2f;
+    --accent: #C68A2B;
+    --accent-dim: rgba(198,138,43,0.12);
+    --text: #e8e8ea;
+    --muted: #6b6b75;
+    --green: #22c55e;
+    --red: #ef4444;
+    --mono: 'Courier New', monospace;
+    --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 48px 16px;
+  }
+
+  header { text-align: center; margin-bottom: 40px; }
+
+  .logo-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 12px;
+  }
+
+  h1 {
+    font-size: clamp(22px, 5vw, 34px);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+  }
+
+  h1 span { color: var(--accent); }
+
+  .sub { margin-top: 10px; font-size: 14px; color: var(--muted); }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 32px;
+    width: 100%;
+    max-width: 780px;
+  }
+
+  .drop-zone {
+    border: 2px dashed var(--border);
+    border-radius: 10px;
+    padding: 48px 24px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    position: relative;
+  }
+
+  .drop-zone:hover, .drop-zone.drag-over {
+    border-color: var(--accent);
+    background: var(--accent-dim);
+  }
+
+  .drop-zone input[type="file"] {
+    position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+  }
+
+  .drop-icon { font-size: 40px; margin-bottom: 12px; display: block; }
+  .drop-label { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
+  .drop-sub { font-size: 13px; color: var(--muted); }
+
+  .file-name {
+    display: none; margin-top: 12px; font-size: 13px;
+    color: var(--accent); font-weight: 600; text-align: center;
+  }
+
+  /* Options */
+  .options {
+    display: none;
+    margin-top: 24px;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .option-chip {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #111113;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size: 13px;
+    color: var(--muted);
+    cursor: pointer;
+    transition: border-color 0.15s, color 0.15s;
+    user-select: none;
+  }
+
+  .option-chip input { accent-color: var(--accent); cursor: pointer; }
+  .option-chip:hover { border-color: var(--accent); color: var(--text); }
+
+  .run-btn {
+    display: none;
+    margin-top: 20px;
+    width: 100%;
+    background: var(--accent);
+    color: #0e0e10;
+    border: none;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 700;
+    padding: 13px;
+    cursor: pointer;
+    font-family: var(--sans);
+    transition: opacity 0.15s;
+  }
+
+  .run-btn:hover { opacity: 0.88; }
+
+  /* Stats */
+  .stats {
+    display: none;
+    margin-top: 20px;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .stat-pill {
+    background: var(--accent-dim);
+    border: 1px solid rgba(198,138,43,0.25);
+    border-radius: 999px;
+    padding: 4px 14px;
+    font-size: 12px;
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  /* Diff view */
+  .diff-section {
+    display: none;
+    margin-top: 28px;
+  }
+
+  .diff-tabs {
+    display: flex;
+    gap: 2px;
+    margin-bottom: 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .diff-tab {
+    padding: 8px 18px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--muted);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    transition: color 0.15s, border-color 0.15s;
+  }
+
+  .diff-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  .diff-pane {
+    background: #111113;
+    border: 1px solid var(--border);
+    border-top: none;
+    border-radius: 0 0 8px 8px;
+    padding: 16px;
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1.8;
+    color: #b0b0ba;
+    max-height: 380px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+    display: none;
+  }
+
+  .diff-pane.active { display: block; }
+  .diff-pane::-webkit-scrollbar { width: 4px; }
+  .diff-pane::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+  /* Highlight removed lines red, added green */
+  .removed { color: var(--red); text-decoration: line-through; opacity: 0.7; }
+  .added { color: var(--green); }
+
+  .actions {
+    display: none;
+    margin-top: 20px;
+    gap: 10px;
+  }
+
+  button.btn-primary {
+    background: var(--accent);
+    color: #0e0e10;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 10px 20px;
+    flex: 1;
+    font-family: var(--sans);
+    transition: opacity 0.15s;
+  }
+
+  button.btn-primary:hover { opacity: 0.88; }
+
+  button.btn-ghost {
+    background: var(--surface);
+    color: var(--muted);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 10px 20px;
+    font-family: var(--sans);
+    transition: color 0.15s;
+  }
+
+  button.btn-ghost:hover { color: var(--text); }
+
+  .msg {
+    margin-top: 14px;
+    font-size: 13px;
+    padding: 10px 14px;
+    border-radius: 8px;
+    display: none;
+  }
+
+  .msg.success {
+    background: rgba(34,197,94,0.1);
+    color: var(--green);
+    border: 1px solid rgba(34,197,94,0.2);
+  }
+
+  .msg.error {
+    background: rgba(239,68,68,0.1);
+    color: var(--red);
+    border: 1px solid rgba(239,68,68,0.2);
+  }
+
+  footer {
+    margin-top: 40px;
+    font-size: 12px;
+    color: var(--muted);
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo-label">Zalawra Toolkit</div>
+  <h1>Markdown <span>Cleaner</span></h1>
+  <p class="sub">Reconstruct messy PDF-extracted .md files — fix spacing, remove noise, rebuild paragraphs.</p>
+</header>
+
+<div class="card">
+  <div class="drop-zone" id="dropZone">
+    <input type="file" id="fileInput" accept=".md,.txt">
+    <span class="drop-icon">🧹</span>
+    <div class="drop-label">Drop your .md file here or click to browse</div>
+    <div class="drop-sub">Output from the PDF → Markdown converter</div>
+  </div>
+
+  <div class="file-name" id="fileName"></div>
+
+  <div class="options" id="optionsWrap">
+    <label class="option-chip"><input type="checkbox" id="optSpaced" checked> Fix spaced-out letters (T H I S → THIS)</label>
+    <label class="option-chip"><input type="checkbox" id="optFooters" checked> Remove repeated footer/header lines</label>
+    <label class="option-chip"><input type="checkbox" id="optLoneNums" checked> Remove lone page numbers</label>
+    <label class="option-chip"><input type="checkbox" id="optPageMarkers" checked> Remove page markers (*Page N*)</label>
+    <label class="option-chip"><input type="checkbox" id="optParagraphs" checked> Reconstruct broken paragraphs</label>
+    <label class="option-chip"><input type="checkbox" id="optBlankLines" checked> Collapse excess blank lines</label>
+    <label class="option-chip"><input type="checkbox" id="optDividers" checked> Remove --- dividers</label>
+  </div>
+
+  <button class="run-btn" id="runBtn">✨ Clean & Reconstruct</button>
+
+  <div class="stats" id="stats">
+    <div class="stat-pill" id="statLines">—</div>
+    <div class="stat-pill" id="statWords">—</div>
+    <div class="stat-pill" id="statRemoved">—</div>
+  </div>
+
+  <div class="diff-section" id="diffSection">
+    <div class="diff-tabs">
+      <div class="diff-tab active" data-pane="clean">Cleaned</div>
+      <div class="diff-tab" data-pane="original">Original</div>
+    </div>
+    <div class="diff-pane active" id="paneClean"></div>
+    <div class="diff-pane" id="paneOriginal"></div>
+  </div>
+
+  <div class="actions" id="actions">
+    <button class="btn-primary" id="downloadBtn">⬇ Download clean .md</button>
+    <button class="btn-ghost" id="resetBtn">Clean another</button>
+  </div>
+
+  <div class="msg" id="msg"></div>
+</div>
+
+<footer>Client-side only · Nothing leaves your device · Built for Zalawra RAG pipeline</footer>
+
+<script>
+  let originalContent = '';
+  let cleanedContent = '';
+  let currentFileName = '';
+
+  const dropZone = document.getElementById('dropZone');
+  const fileInput = document.getElementById('fileInput');
+  const fileNameEl = document.getElementById('fileName');
+  const optionsWrap = document.getElementById('optionsWrap');
+  const runBtn = document.getElementById('runBtn');
+  const stats = document.getElementById('stats');
+  const diffSection = document.getElementById('diffSection');
+  const paneClean = document.getElementById('paneClean');
+  const paneOriginal = document.getElementById('paneOriginal');
+  const actions = document.getElementById('actions');
+  const downloadBtn = document.getElementById('downloadBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const msg = document.getElementById('msg');
+
+  // Drag & drop
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('drag-over');
+    if (e.dataTransfer.files.length) loadFile(e.dataTransfer.files[0]);
+  });
+  fileInput.addEventListener('change', () => { if (fileInput.files.length) loadFile(fileInput.files[0]); });
+
+  async function loadFile(file) {
+    originalContent = await file.text();
+    currentFileName = file.name.replace(/\.md$/i, '');
+    fileNameEl.style.display = 'block';
+    fileNameEl.textContent = '📎 ' + file.name;
+    optionsWrap.style.display = 'flex';
+    runBtn.style.display = 'block';
+    showMsg('', '');
+    stats.style.display = 'none';
+    diffSection.style.display = 'none';
+    actions.style.display = 'none';
+  }
+
+  runBtn.addEventListener('click', () => {
+    if (!originalContent) return;
+    cleanedContent = clean(originalContent);
+    displayResults();
+  });
+
+  function clean(text) {
+    let lines = text.split('\n');
+    const originalLineCount = lines.length;
+
+    // Step 1: Fix spaced-out letters like "T H E   C O N S T I T U T I O N"
+    if (document.getElementById('optSpaced').checked) {
+      lines = lines.map(line => {
+        // Detect lines where most chars are single letters separated by spaces
+        // Pattern: "A B C D" or "T HE" etc.
+        const stripped = line.replace(/^#+\s*/, '');
+        const spacedPattern = /^([A-Z]\s){3,}[A-Z]?/;
+        if (spacedPattern.test(stripped.trim())) {
+          const prefix = line.match(/^(#+\s*)/) ? line.match(/^(#+\s*)/)[1] : '';
+          const fixed = stripped.replace(/([A-Z])\s(?=[A-Z])/g, '$1').replace(/\s+/g, ' ').trim();
+          return prefix + fixed;
+        }
+        return line;
+      });
+    }
+
+    // Step 2: Remove repeated footer/header lines (lines appearing 5+ times)
+    if (document.getElementById('optFooters').checked) {
+      const lineFreq = {};
+      for (const line of lines) {
+        const key = line.trim().toLowerCase();
+        if (key.length > 20) {
+          lineFreq[key] = (lineFreq[key] || 0) + 1;
+        }
+      }
+      const repeated = new Set(Object.keys(lineFreq).filter(k => lineFreq[k] >= 4));
+      lines = lines.filter(line => {
+        const key = line.trim().toLowerCase();
+        return !repeated.has(key);
+      });
+    }
+
+    // Step 3: Remove lone page numbers (lines that are just a number)
+    if (document.getElementById('optLoneNums').checked) {
+      lines = lines.filter(line => !/^\s*\d{1,4}\s*$/.test(line));
+    }
+
+    // Step 4: Remove page markers like *Page 1*, ---
+    if (document.getElementById('optPageMarkers').checked) {
+      lines = lines.filter(line => !/^\*Page\s+\d+\*$/.test(line.trim()));
+    }
+
+    if (document.getElementById('optDividers').checked) {
+      lines = lines.filter(line => line.trim() !== '---');
+    }
+
+    // Step 5: Reconstruct broken paragraphs
+    // A broken paragraph is a short line (< 80 chars) that doesn't end with punctuation
+    // and the next line also doesn't start with a heading marker
+    if (document.getElementById('optParagraphs').checked) {
+      const reconstructed = [];
+      let buffer = '';
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        const trimmed = line.trim();
+        const nextLine = i + 1 < lines.length ? lines[i + 1].trim() : '';
+
+        // Always flush buffer on empty lines or headings
+        if (trimmed === '') {
+          if (buffer) { reconstructed.push(buffer.trim()); buffer = ''; }
+          reconstructed.push('');
+          continue;
+        }
+
+        if (/^#{1,6}\s/.test(trimmed)) {
+          if (buffer) { reconstructed.push(buffer.trim()); buffer = ''; }
+          reconstructed.push(line);
+          continue;
+        }
+
+        // Check if this line is a list item or special
+        if (/^[-*•\d]/.test(trimmed)) {
+          if (buffer) { reconstructed.push(buffer.trim()); buffer = ''; }
+          reconstructed.push(line);
+          continue;
+        }
+
+        // Detect if line is broken mid-sentence:
+        // - doesn't end with sentence-ending punctuation
+        // - is reasonably short (less than 90 chars)
+        // - next line starts with lowercase or continues a sentence
+        const endsWithPunct = /[.!?;:,)\]"]$/.test(trimmed);
+        const isBroken = !endsWithPunct && trimmed.length < 90 && nextLine && !/^#{1,6}\s/.test(nextLine) && nextLine !== '';
+
+        if (isBroken) {
+          buffer += (buffer ? ' ' : '') + trimmed;
+        } else {
+          buffer += (buffer ? ' ' : '') + trimmed;
+          reconstructed.push(buffer.trim());
+          buffer = '';
+        }
+      }
+
+      if (buffer) reconstructed.push(buffer.trim());
+      lines = reconstructed;
+    }
+
+    // Step 6: Collapse excess blank lines (max 2 consecutive)
+    if (document.getElementById('optBlankLines').checked) {
+      const collapsed = [];
+      let blankCount = 0;
+      for (const line of lines) {
+        if (line.trim() === '') {
+          blankCount++;
+          if (blankCount <= 1) collapsed.push(line);
+        } else {
+          blankCount = 0;
+          collapsed.push(line);
+        }
+      }
+      lines = collapsed;
+    }
+
+    return lines.join('\n').trim();
+  }
+
+  function displayResults() {
+    const origLines = originalContent.split('\n').length;
+    const cleanLines = cleanedContent.split('\n').length;
+    const removed = origLines - cleanLines;
+    const words = cleanedContent.split(/\s+/).filter(Boolean).length;
+
+    stats.style.display = 'flex';
+    document.getElementById('statLines').textContent = `${cleanLines.toLocaleString()} lines`;
+    document.getElementById('statWords').textContent = `${words.toLocaleString()} words`;
+    document.getElementById('statRemoved').textContent = `${removed.toLocaleString()} lines removed`;
+
+    paneClean.textContent = cleanedContent.slice(0, 5000) + (cleanedContent.length > 5000 ? '\n\n...(truncated preview)' : '');
+    paneOriginal.textContent = originalContent.slice(0, 5000) + (originalContent.length > 5000 ? '\n\n...(truncated preview)' : '');
+
+    diffSection.style.display = 'block';
+    actions.style.display = 'flex';
+    showMsg(`✓ Done. Removed ${removed.toLocaleString()} noisy lines. ${words.toLocaleString()} words in clean output.`, 'success');
+  }
+
+  // Tab switching
+  document.querySelectorAll('.diff-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.diff-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.diff-pane').forEach(p => p.classList.remove('active'));
+      tab.classList.add('active');
+      document.getElementById('pane' + tab.dataset.pane.charAt(0).toUpperCase() + tab.dataset.pane.slice(1)).classList.add('active');
+    });
+  });
+
+  downloadBtn.addEventListener('click', () => {
+    const blob = new Blob([cleanedContent], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = currentFileName + '_clean.md';
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+
+  resetBtn.addEventListener('click', () => {
+    originalContent = ''; cleanedContent = ''; currentFileName = '';
+    fileInput.value = '';
+    fileNameEl.style.display = 'none';
+    optionsWrap.style.display = 'none';
+    runBtn.style.display = 'none';
+    stats.style.display = 'none';
+    diffSection.style.display = 'none';
+    actions.style.display = 'none';
+    showMsg('', '');
+  });
+
+  function showMsg(text, type) {
+    msg.style.display = text ? 'block' : 'none';
+    msg.className = 'msg ' + type;
+    msg.textContent = text;
+  }
+</script>
+</body>
+</html>
